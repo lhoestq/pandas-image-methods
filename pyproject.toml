@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "pandas-image-methods"
+version = "0.1.0"
+description = "Image methods for pandas dataframes using Pillow"
+authors = ["Quentin Lhoest"]
+license = "Apache License 2.0"
+readme = "README.md"
+packages = [
+    { include = "pandas_image_methods" },
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+numpy = ">=2.0"
+pandas = ">=2.0"
+pyarrow = ">=0.18"
+pillow = ">=9"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
