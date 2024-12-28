@@ -37,7 +37,7 @@ def _decode_pil_image(encoded_image: dict) -> "PIL.Image.Image":
     return PIL.Image.open(BytesIO(encoded_image["bytes"])) if encoded_image["bytes"] else PIL.Image.open(encoded_image["path"])
 
 
-class PILArray(ExtensionArray):
+class ImageArray(ExtensionArray):
     _pa_type = pa.struct({"bytes": pa.binary(), "path": pa.string()})
 
     def __init__(self, data: np.ndarray) -> None:
@@ -87,19 +87,20 @@ class PILArray(ExtensionArray):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, item) -> "PIL.Image.Image | PILArray":
+    def __getitem__(self, item) -> "PIL.Image.Image | ImageArray":
         if isinstance(item, int):
             return self.data[item]
         return type(self)(self.data[item])
 
-    def copy(self) -> "PILArray":
-        return PILArray(self.data.copy())
+    def copy(self) -> "ImageArray":
+        return ImageArray(self.data.copy())
 
     def __arrow_array__(self, type=None):
         return pa.array([_encode_pil_image(image) if image is not None else None for image in self.data], type=type or self._pa_type)
 
     def _formatter(self, boxed=False):
-        return lambda x: f"<PIL.Image.Image size={x.shape[0]}x{x.shape[1]}>"
+        return lambda x: f"<PIL.Image.Image size={x.shape[0]}x{x.shape[1]}>" if isinstance(x, np.ndarray) else str(x)
+
 
 class PILMethods:
 
@@ -107,9 +108,14 @@ class PILMethods:
         self.data = data
 
     def open(self):
-        return pd.Series(PILArray._from_sequence(self.data))
+        return pd.Series(ImageArray._from_sequence(self.data))
+
+    def enable(self):
+        return pd.Series(ImageArray._from_sequence_of_images(self.data))
 
     def _apply(self, *args, _func, **kwargs):
+        if not isinstance(self.data.array, ImageArray):
+            raise Exception("You need to enable PIL methods first, using for example: df['image'] = df['image'].pil.enable()")
         out = [_func(x, *args, **kwargs) for x in self.data]
         try:
             return pd.Series(type(self.data.array)._from_sequence(out))
@@ -123,5 +129,12 @@ class PILMethods:
             return f'<img style="max-height: 100px;", src="data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}">'
 
 for _name, _func in inspect.getmembers(PIL.Image.Image, predicate=inspect.isfunction):
-    if not _name.startswith("_") and _name not in ["open", "load"]:
+    if not _name.startswith("_") and _name not in ["open", "save", "load"]:
         setattr(PILMethods, _name, partialmethod(PILMethods._apply, _func=_func))
+
+
+_sts = pd.Series.to_string
+def _new_sts(self, *args, **kwargs):
+    return _sts(self, *args, **kwargs) + (", PIL methods enabled" if isinstance(self.array, ImageArray) else "")
+    
+pd.Series.to_string = _new_sts

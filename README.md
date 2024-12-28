@@ -1,6 +1,12 @@
 # Pandas Image Methods
 
-Image methods for pandas dataframes using Pillow
+Image methods for pandas dataframes using Pillow.
+
+Features:
+
+* Use `PIL.Image` objects in pandas dataframes
+* Call `PIL.Image` methods like `.rotate()` on a column
+* Save dataframes with `PIL.Image` objects to Parquet
 
 ## Installation
 
@@ -10,7 +16,7 @@ pip install pandas-image-methods
 
 ## Usage
 
-You can open images as `PIL.Image.Image` objects using the `open()` method.
+You can open images as `PIL.Image` objects using the `.open()` method.
 
 Once the images are opened, you can call any [PIL Image method](https://pillow.readthedocs.io/en/stable/reference/Image.html#the-image-class):
 
@@ -23,11 +29,23 @@ pd.api.extensions.register_series_accessor("pil")(PILMethods)
 df = pd.DataFrame({"image": ["path/to/image.png"]})
 df["image"] = df["image"].pil.open()
 df["image"] = df["image"].pil.rotate(90)
+# 0    <PIL.Image.Image size=200x200>
+# Name: image, dtype: object, PIL methods enabled
+```
+
+Here is how to enable `PIL` methods for `PIL Images` created manually:
+
+```python
+df = pd.DataFrame({"image": [PIL.Image.open("path/to/image.png")]})
+df["image"] = df["image"].pil.enable()
+df["image"] = df["image"].pil.rotate(90)
+# 0    <PIL.Image.Image size=200x200>
+# Name: image, dtype: object, PIL methods enabled
 ```
 
 ## Save
 
-You can save a dataset of `PIL Images` in Parquet:
+You can save a dataset of `PIL Images` to Parquet:
 
 ```python
 # Save
@@ -40,7 +58,12 @@ df = pd.read_parquet("data.parquet")
 df["image"] = df["image"].pil.open()
 ```
 
-Note: this doesn't just save the paths to the image files, but the actual images themselves !
+This doesn't just save the paths to the image files, but the actual images themselves !
+
+Under the hood it saves dictionaries of `{"bytes": <bytes of the image file>, "path": <path or name of the image file>}`.
+The images are saved as bytes using their image encoding or PNG by default. Anyone can load the Parquet data even without `pandas-image-methods` since it doesn't rely on extension types.
+
+Note: if you created the `PIL Images` manually, don't forget to enable the `PIL` methods to enable saving to Parquet.
 
 ## Hugging Face support
 
@@ -65,9 +88,3 @@ HTML(df.head().to_html(escape=False, formatters={"image": df.image.pil.html_form
 Example on the [julien-c/impressionists](https://huggingface.co/datasets/julien-c/impressionists) dataset for painting classification:
 
 ![output of the html formatter on Colab](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/datasets/pandas-image-methods-html_formatter.png)
-
-## Parquet content
-
-Thanks to a pandas `ExtensionArray`, `pandas-image-methods` is able to read and write dataframes of `PIL Images` to Parquet automatically.
-Under the hood it saves dictionaries of `{"bytes": <bytes of the image file>, "path": <path or name of the image file>}`.
-The images are saved as bytes using their image encoding or PNG by default. This doesn't rely on extension types on purpose to allow people that don't have `pandas-image-methods` to load the Parquet data anyway.
