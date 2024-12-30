@@ -97,7 +97,7 @@ Most image datasets in Parquet format on Hugging Face are compatible with `panda
 
 ```python
 df = pd.read_parquet("hf://datasets/uoft-cs/cifar100/cifar100/train-00000-of-00001.parquet")
-df["image"] = df["image"].pil.open()
+df["image"] = df["image"].pil.enable()
 ```
 
 Datasets created with `pandas-image-methods` and saved to Parquet are compatible with the [Dataset Viewer](https://huggingface.co/docs/hub/en/datasets-viewer) on Hugging Face and the [datasets](https://github.com/huggingface/datasets) library.
