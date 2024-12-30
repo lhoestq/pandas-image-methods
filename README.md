@@ -13,6 +13,7 @@ Features:
   * `.transpose()`
 * Save dataframes with `PIL.Image` objects to Parquet
 * Process images in parallel with Dask
+* Manipulate image datasets from Hugging Face
 
 ## Installation
 
@@ -100,7 +101,7 @@ df = pd.read_parquet("hf://datasets/uoft-cs/cifar100/cifar100/train-00000-of-000
 df["image"] = df["image"].pil.enable()
 ```
 
-Datasets created with `pandas-image-methods` and saved to Parquet are compatible with the [Dataset Viewer](https://huggingface.co/docs/hub/en/datasets-viewer) on Hugging Face and the [datasets](https://github.com/huggingface/datasets) library.
+Datasets created with `pandas-image-methods` and saved to Parquet are also compatible with the [Dataset Viewer](https://huggingface.co/docs/hub/en/datasets-viewer) on Hugging Face and the [datasets](https://github.com/huggingface/datasets) library.
 
 ## Display in Notebooks
 
