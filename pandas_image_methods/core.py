@@ -1,8 +1,10 @@
 import base64
 import inspect
-from functools import partialmethod
+from functools import partialmethod, partial, wraps
 from io import BytesIO
+from math import prod
 
+import fsspec
 import numpy as np
 import pandas as pd
 import PIL.Image
@@ -48,13 +50,17 @@ class ImageArray(ExtensionArray):
         return pd.core.dtypes.dtypes.NumpyEADtype("object")
 
     @property
+    def nbytes(self):
+        return sum(prod(image.size) * image.bits for image in self)
+
+    @property
     def feature(self):
         return {"_type": "Image"}
 
     @classmethod
     def _from_sequence_of_strings(cls, strings, *, dtype: Dtype | None = None, copy: bool = False):
         a = np.empty(len(strings), dtype=object)
-        a[:] = [PIL.Image.open(path) if path is not None else None for path in strings]
+        a[:] = [PIL.Image.open(fsspec.open(path).open()) if path is not None else None for path in strings]
         return cls(a)
 
     @classmethod
@@ -79,7 +85,7 @@ class ImageArray(ExtensionArray):
             return cls._from_sequence_of_encoded_images(scalars, dtype=dtype, copy=copy)
         elif isinstance(scalars[0], PIL.Image.Image):
             return cls._from_sequence_of_images(scalars, dtype=dtype, copy=copy)
-        raise TypeError()
+        raise TypeError(type(scalars[0].__name__))
 
     def __eq__(self, value: object) -> bool:
         return self.data == value.data
@@ -101,18 +107,35 @@ class ImageArray(ExtensionArray):
     def _formatter(self, boxed=False):
         return lambda x: f"<PIL.Image.Image size={x.shape[0]}x{x.shape[1]}>" if isinstance(x, np.ndarray) else str(x)
 
+_meta = pd.Series([], dtype=object)
 
 class PILMethods:
 
     def __init__(self, data: pd.Series) -> None:
         self.data = data
+    
+    @classmethod
+    def _init_and_run(cls, data, *, func, args, kwargs):
+        return func(cls(data), *args, **kwargs)
 
+    @staticmethod
+    def _wrap_for_dask(func):
+        @wraps(func)
+        def wrapped(self, *args, **kwargs):
+            if hasattr(self.data, "map_partitions"):
+                return self.data.map_partitions(partial(self._init_and_run, func=func, args=args, kwargs=kwargs), meta=_meta)
+            return func(self, *args, **kwargs)
+        return wrapped
+
+    @_wrap_for_dask
     def open(self):
+        return pd.Series(ImageArray._from_sequence_of_strings(self.data))
+
+    @_wrap_for_dask
+    def enable(self):
         return pd.Series(ImageArray._from_sequence(self.data))
 
-    def enable(self):
-        return pd.Series(ImageArray._from_sequence_of_images(self.data))
-
+    @_wrap_for_dask
     def _apply(self, *args, _func, **kwargs):
         if not isinstance(self.data.array, ImageArray):
             raise Exception("You need to enable PIL methods first, using for example: df['image'] = df['image'].pil.enable()")
@@ -125,7 +148,7 @@ class PILMethods:
     @staticmethod
     def html_formatter(x):
         with BytesIO() as buffer:
-            PIL.Image.fromarray(x.astype(np.uint8())).save(buffer, 'jpeg')
+            (PIL.Image.fromarray(x.astype(np.uint8())) if isinstance(x, np.ndarray) else x).save(buffer, 'jpeg')
             return f'<img style="max-height: 100px;", src="data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}">'
 
 for _name, _func in inspect.getmembers(PIL.Image.Image, predicate=inspect.isfunction):

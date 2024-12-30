@@ -5,8 +5,14 @@ Image methods for pandas dataframes using Pillow.
 Features:
 
 * Use `PIL.Image` objects in pandas dataframes
-* Call `PIL.Image` methods like `.rotate()` on a column
+* Call `PIL.Image` methods on a column, for example:
+  * `.crop()`
+  * `.filter()`
+  * `.resize()`
+  * `.rotate()`
+  * `.transpose()`
 * Save dataframes with `PIL.Image` objects to Parquet
+* Process images in parallel with Dask
 
 ## Installation
 
@@ -26,8 +32,8 @@ from pandas_image_methods import PILMethods
 
 pd.api.extensions.register_series_accessor("pil")(PILMethods)
 
-df = pd.DataFrame({"image": ["path/to/image.png"]})
-df["image"] = df["image"].pil.open()
+df = pd.DataFrame({"file_path": ["path/to/image.png"]})
+df["image"] = df["file_path"].pil.open()
 df["image"] = df["image"].pil.rotate(90)
 # 0    <PIL.Image.Image size=200x200>
 # Name: image, dtype: object, PIL methods enabled
@@ -49,13 +55,13 @@ You can save a dataset of `PIL Images` to Parquet:
 
 ```python
 # Save
-df = pd.DataFrame({"image": ["path/to/image.png"]})
-df["image"] = df["image"].pil.open()
+df = pd.DataFrame({"file_path": ["path/to/image.png"]})
+df["image"] = df["file_path"].pil.open()
 df.to_parquet("data.parquet")
 
 # Later
 df = pd.read_parquet("data.parquet")
-df["image"] = df["image"].pil.open()
+df["image"] = df["image"].pil.enable()
 ```
 
 This doesn't just save the paths to the image files, but the actual images themselves !
@@ -64,6 +70,26 @@ Under the hood it saves dictionaries of `{"bytes": <bytes of the image file>, "p
 The images are saved as bytes using their image encoding or PNG by default. Anyone can load the Parquet data even without `pandas-image-methods` since it doesn't rely on extension types.
 
 Note: if you created the `PIL Images` manually, don't forget to enable the `PIL` methods to enable saving to Parquet.
+
+## Run in parallel
+
+Dask DataFrame parallelizes pandas to handle large datasets. It enables faster local processing with multiprocessing as well as distributed large scale processing. Dask mimics the pandas API:
+
+```python
+import dask.dataframe as dd
+from pandas_image_methods import PILMethods
+
+dd.api.extensions.register_series_accessor("pil")(PILMethods)
+
+df = dd.read_csv("path/to/large/dataset.csv")
+df = df.repartition(npartitions=1000)  # divide the processing in 1000 jobs
+
+df["image"] = df["file_path"].pil.open()
+df["image"] = df["image"].pil.rotate(90)
+df["image"].head(1)
+# 0    <PIL.Image.Image size=200x200>
+# Name: image, dtype: object, PIL methods enabled
+```
 
 ## Hugging Face support
 
