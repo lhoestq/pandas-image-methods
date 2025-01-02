@@ -78,18 +78,21 @@ Dask DataFrame parallelizes pandas to handle large datasets. It enables faster l
 
 ```python
 import dask.dataframe as dd
+from distributed import Client
 from pandas_image_methods import PILMethods
 
 dd.api.extensions.register_series_accessor("pil")(PILMethods)
 
-df = dd.read_csv("path/to/large/dataset.csv")
-df = df.repartition(npartitions=1000)  # divide the processing in 1000 jobs
-
-df["image"] = df["file_path"].pil.open()
-df["image"] = df["image"].pil.rotate(90)
-df["image"].head(1)
-# 0    <PIL.Image.Image size=200x200>
-# Name: image, dtype: object, PIL methods enabled
+if __name__ == "__main__":
+    client = Client()
+    df = dd.read_csv("path/to/large/dataset.csv")
+    df = df.repartition(npartitions=1000)  # divide the processing in 1000 jobs
+    df["image"] = df["file_path"].pil.open()
+    df["image"] = df["image"].pil.rotate(90)
+    df["image"].head(1)
+    # 0    <PIL.Image.Image size=200x200>
+    # Name: image, dtype: object, PIL methods enabled
+    df.to_parquet("data_folder")
 ```
 
 ## Hugging Face support

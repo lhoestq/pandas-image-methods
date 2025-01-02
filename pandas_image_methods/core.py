@@ -1,6 +1,6 @@
 import base64
 import inspect
-from functools import partialmethod, partial, wraps
+from functools import partialmethod
 from io import BytesIO
 from math import prod
 
@@ -12,9 +12,11 @@ import pyarrow as pa
 from pandas._typing import Dtype
 from pandas.api.extensions import ExtensionArray
 
+from . import dask
 from . import huggingface
 
 
+dask.init()
 huggingface.init()
 PIL.Image.init()
 _IMAGE_COMPRESSION_FORMATS = list(set(PIL.Image.OPEN.keys()) & set(PIL.Image.SAVE.keys()))
@@ -47,11 +49,13 @@ class ImageArray(ExtensionArray):
 
     @property
     def dtype(self):
-        return pd.core.dtypes.dtypes.NumpyEADtype("object")
+        dtype = pd.core.dtypes.dtypes.NumpyEADtype("object")
+        dtype.construct_array_type = lambda: ImageArray
+        return dtype
 
     @property
     def nbytes(self):
-        return sum(prod(image.size) * image.bits for image in self)
+        return sum(prod(image.size) * getattr(image, "bits", 8) for image in self)
 
     @property
     def feature(self):
@@ -102,40 +106,40 @@ class ImageArray(ExtensionArray):
         return ImageArray(self.data.copy())
 
     def __arrow_array__(self, type=None):
-        return pa.array([_encode_pil_image(image) if image is not None else None for image in self.data], type=type or self._pa_type)
+        return pa.array([_encode_pil_image(image) if image is not None else None for image in self.data], type=self._pa_type)
 
     def _formatter(self, boxed=False):
         return lambda x: f"<PIL.Image.Image size={x.shape[0]}x{x.shape[1]}>" if isinstance(x, np.ndarray) else str(x)
+    
+    @classmethod
+    def _empty(cls, shape, dtype=None):
+        return cls(np.array([None] * shape, dtype=object))
 
-_meta = pd.Series([], dtype=object)
+
+ImageArray._array_empty = ImageArray._empty(0)
+ImageArray._array_nonempty = ImageArray._from_sequence_of_images([PIL.Image.new(mode="RGB", size=(16, 16))] * 2)
+
 
 class PILMethods:
+    _meta = pd.Series(ImageArray._array_empty)
+    _meta_nonempty = pd.Series(ImageArray._array_nonempty)
 
     def __init__(self, data: pd.Series) -> None:
         self.data = data
     
     @classmethod
-    def _init_and_run(cls, data, *, func, args, kwargs):
+    def pil_method(cls, data, *, func, args, kwargs):
         return func(cls(data), *args, **kwargs)
 
-    @staticmethod
-    def _wrap_for_dask(func):
-        @wraps(func)
-        def wrapped(self, *args, **kwargs):
-            if hasattr(self.data, "map_partitions"):
-                return self.data.map_partitions(partial(self._init_and_run, func=func, args=args, kwargs=kwargs), meta=_meta)
-            return func(self, *args, **kwargs)
-        return wrapped
-
-    @_wrap_for_dask
+    @dask.wrap_method
     def open(self):
         return pd.Series(ImageArray._from_sequence_of_strings(self.data))
 
-    @_wrap_for_dask
+    @dask.wrap_method
     def enable(self):
         return pd.Series(ImageArray._from_sequence(self.data))
 
-    @_wrap_for_dask
+    @dask.wrap_method
     def _apply(self, *args, _func, **kwargs):
         if not isinstance(self.data.array, ImageArray):
             raise Exception("You need to enable PIL methods first, using for example: df['image'] = df['image'].pil.enable()")
