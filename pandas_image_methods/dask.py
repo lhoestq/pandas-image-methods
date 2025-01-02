@@ -16,8 +16,11 @@ def wrap_method(func):
 
 
 def init():
-    from dask.dataframe.extensions import make_array_nonempty
+    try:
+        from dask.dataframe.extensions import make_array_nonempty
 
-    @make_array_nonempty.register(pd.core.dtypes.dtypes.NumpyEADtype)
-    def _(dtype):
-        return dtype.construct_array_type()._array_nonempty
+        @make_array_nonempty.register(pd.core.dtypes.dtypes.NumpyEADtype)
+        def _(dtype):
+            return dtype.construct_array_type()._array_nonempty
+    except ImportError:
+        pass
