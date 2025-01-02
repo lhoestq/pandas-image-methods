@@ -114,6 +114,19 @@ class ImageArray(ExtensionArray):
     @classmethod
     def _empty(cls, shape, dtype=None):
         return cls(np.array([None] * shape, dtype=object))
+    
+    @classmethod
+    def _concat_same_type(cls, to_concat):
+        return ImageArray._from_sequence([image for array in to_concat for image in array])
+    
+    def take(self, indices, *, allow_fill=False, fill_value=None):
+        from pandas.api.extensions import take
+
+        if allow_fill and fill_value is None:
+            fill_value = self.dtype.na_value
+
+        result = take(self.data, indices, fill_value=fill_value, allow_fill=allow_fill)
+        return self._from_sequence(result, dtype=self.dtype)
 
 
 ImageArray._array_empty = ImageArray._empty(0)
