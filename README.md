@@ -104,7 +104,11 @@ df = pd.read_parquet("hf://datasets/uoft-cs/cifar100/cifar100/train-00000-of-000
 df["image"] = df["image"].pil.enable()
 ```
 
-Datasets created with `pandas-image-methods` and saved to Parquet are also compatible with the [Dataset Viewer](https://huggingface.co/docs/hub/en/datasets-viewer) on Hugging Face and the [datasets](https://github.com/huggingface/datasets) library.
+Datasets created with `pandas-image-methods` and saved to Parquet are also compatible with the [Dataset Viewer](https://huggingface.co/docs/hub/en/datasets-viewer) on Hugging Face and the [datasets](https://github.com/huggingface/datasets) library:
+
+```python
+df.to_parquet("hf://datasets/username/dataset_name/train.parquet")
+```
 
 ## Display in Notebooks
 
