@@ -104,6 +104,15 @@ df = pd.read_parquet("hf://datasets/uoft-cs/cifar100/cifar100/train-00000-of-000
 df["image"] = df["image"].pil.enable()
 ```
 
+You can also use the `datasets` library, here is an example on the [julien-c/impressionists](https://huggingface.co/datasets/julien-c/impressionists) dataset for painting classification:
+
+```python
+from datasets import load_dataset
+
+df = load_dataset("julien-c/impressionists", split="train").to_pandas()
+df["image"] = df["image"].pil.enable()
+```
+
 Datasets created with `pandas-image-methods` and saved to Parquet are also compatible with the [Dataset Viewer](https://huggingface.co/docs/hub/en/datasets-viewer) on Hugging Face and the [datasets](https://github.com/huggingface/datasets) library:
 
 ```python
@@ -118,7 +127,5 @@ You can display a pandas dataframe of images in a Jupyter Notebook or on Google 
 from IPython.display import HTML
 HTML(df.head().to_html(escape=False, formatters={"image": df.image.pil.html_formatter}))
 ```
-
-Example on the [julien-c/impressionists](https://huggingface.co/datasets/julien-c/impressionists) dataset for painting classification:
 
 ![output of the html formatter on Colab](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/datasets/pandas-image-methods-html_formatter.png)
